@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 # Trabalho Prático — Warping e Morphing de Imagens (INF394 - Processamento Digital de Imagens)
 
 Este repositório contém o **código base** para o primeiro trabalho prático da disciplina **Processamento Digital de Imagens (INF394)**, referente ao tema de **transformações geométricas**.  
@@ -109,4 +108,3 @@ O aplicativo abrirá uma interface gráfica com três abas:
 Desenvolvido por **Prof. Marcos H. F. Ribeiro**
 Departamento de Informática — Universidade Federal de Viçosa (UFV)
 Distribuído apenas para fins didáticos no contexto da disciplina INF394 – Processamento Digital de Imagens.
->>>>>>> 882cbf759d42316c8778e430c37c93dd664bcb00

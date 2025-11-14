@@ -4,80 +4,114 @@ from .morph_core import indices_delaunay  # os alunos podem reutilizar
 # ------------------------- Funções a implementar pelos estudantes -------------------------
 
 def pontos_medios(pA, pB):
-    """
-    Retorna os pontos médios (N,2) entre pA e pB.
-    """
-    raise NotImplementedError("Implemente: pontos_medios")
+    return (pA + pB) / 2.0
 
 def indices_pontos_medios(pA, pB):
-    """
-    Calcula a triangulação de Delaunay nos pontos médios e retorna (M,3) int.
-    Dica: use pontos_medios + indices_delaunay().
-    """
-    raise NotImplementedError("Implemente: indices_pontos_medios")
+    return indices_delaunay(pontos_medios(pA, pB))
 
 # Interpoladoras
 def linear(t, a=1.0, b=0.0):
-    """
-    Interpolação linear: a*t + b (espera-se mapear t em [0,1]).
-    """
-    raise NotImplementedError("Implemente: linear")
+    return a * t + b
 
 def sigmoide(t, k):
-    """
-    Sigmoide centrada em 0.5, normalizada para [0,1].
-    k controla a "inclinação": maior k => transição mais rápida no meio.
-    """
-    raise NotImplementedError("Implemente: sigmoide")
+    val = 1.0 / (1.0 + np.exp(-k * (t - 0.5)))
+    
+    inicio = 1.0 / (1.0 + np.exp(k / 2.0))
+    fim = 1.0 / (1.0 + np.exp(-k / 2.0))
+
+    return (val - inicio) / (fim - inicio)
 
 def dummy(t):
-    """
-    Função 'dummy' que pode ser usada como exemplo de função constante.
-    """
-    raise NotImplementedError("Implemente: dummy")
+    return t
 
 # Geometria / warping por triângulos
 def _det3(a, b, c):
-    """
-    Determinante 2D para área assinada (auxiliar das baricêntricas).
-    """
-    raise NotImplementedError("Implemente: _det3")
+    return a[0] * (b[1] - c[1]) + b[0] * (c[1] - a[1]) + c[0] * (a[1] - b[1])
 
 def _transf_baricentrica(pt, tri):
-    """
-    pt: (x,y)
-    tri: (3,2) com vértices v1,v2,v3
-    Retorna (w1,w2,w3); espera-se w1+w2+w3=1 quando pt está no plano do tri.
-    """
-    raise NotImplementedError("Implemente: _transf_baricentrica")
+    v1, v2, v3 = tri[0], tri[1], tri[2]
+    
+    area_total_x2 = _det3(v1, v2, v3)
+
+    if abs(area_total_x2) < 1e-9:
+        return None
+
+    w1 = _det3(pt, v2, v3) / area_total_x2
+    w2 = _det3(v1, pt, v3) / area_total_x2
+    w3 = _det3(v1, v2, pt) / area_total_x2
+    
+    return np.array([w1, w2, w3])
 
 def _check_bari(w1, w2, w3, eps=1e-6):
-    """
-    Testa inclusão de ponto no triângulo usando baricêntricas (com tolerância).
-    """
-    raise NotImplementedError("Implemente: _check_bari")
+    return w1 >= -eps and w2 >= -eps and w3 >= -eps
 
 def _tri_bbox(tri, W, H):
-    """
-    Retorna bounding box inteiro (xmin,xmax,ymin,ymax), recortado ao domínio [0..W-1],[0..H-1].
-    """
-    raise NotImplementedError("Implemente: _tri_bbox")
+    x_coords = tri[:, 0]
+    y_coords = tri[:, 1]
+
+    xmin = np.min(x_coords)
+    xmax = np.max(x_coords)
+    ymin = np.min(y_coords)
+    ymax = np.max(y_coords)
+
+    xmin_int = int(np.maximum(0, np.floor(xmin)))
+    xmax_int = int(np.minimum(W - 1, np.ceil(xmax)))
+    ymin_int = int(np.maximum(0, np.floor(ymin)))
+    ymax_int = int(np.minimum(H - 1, np.ceil(ymax)))
+
+    return xmin_int, xmax_int, ymin_int, ymax_int
 
 def _amostra_bilinear(img_float, x, y):
-    """
-    Amostragem bilinear em (x,y) com clamp nas bordas.
-    img_float: (H,W,3) float32 [0,1] — retorna vetor (3,).
-    """
-    raise NotImplementedError("Implemente: _amostra_bilinear")
+    h, w, _ = img_float.shape
+
+    if x < 0 or x >= w - 1 or y < 0 or y >= h - 1:
+        return np.array([0, 0, 0], dtype=img_float.dtype)
+
+    l, c = int(y), int(x)
+    dl, dc = y - l, x - c
+
+    a1 = img_float[l, c]      # Top-left
+    a2 = img_float[l, c + 1]    # Top-right
+    a3 = img_float[l + 1, c]    # Bottom-left
+    a4 = img_float[l + 1, c + 1]  # Bottom-right
+
+    # Interpolação bilinear
+    top = (1 - dc) * a1 + dc * a2
+    bottom = (1 - dc) * a3 + dc * a4
+
+    pixel = (1 - dl) * top + dl * bottom
+
+    return pixel
 
 def gera_frame(A, B, pA, pB, triangles, alfa, beta):
-    """
-    Gera um frame intermediário por morphing com warping por triângulos.
-    - A,B: imagens (H,W,3) float32 em [0,1]
-    - pA,pB: (N,2) pontos correspondentes
-    - triangles: (M,3) índices de triângulos
-    - alfa: controla geometria (0=A, 1=B)
-    - beta:  controla mistura de cores (0=A, 1=B)
-    Retorna (H,W,3) float32 em [0,1].
-    """
-    raise NotImplementedError("Implemente: gera_frame")
+    H, W, _ = A.shape
+    frame_out = np.zeros_like(A)
+
+    pT = (1 - alfa) * pA + alfa * pB
+
+    for tri_indices in triangles:
+        tri_A = pA[tri_indices]
+        tri_B = pB[tri_indices]
+        tri_T = pT[tri_indices]
+
+        xmin, xmax, ymin, ymax = _tri_bbox(tri_T, W, H)
+
+        for y in range(ymin, ymax + 1):
+            for x in range(xmin, xmax + 1):
+                pt = np.array([x, y])
+                
+                pesos = _transf_baricentrica(pt, tri_T)
+
+                if pesos is not None and _check_bari(pesos[0], pesos[1], pesos[2]):
+                    pt_A = pesos @ tri_A
+                    pt_B = pesos @ tri_B
+
+                    # Amostra as cores em A e B usando interpolação bilinear
+                    cor_A = _amostra_bilinear(A, pt_A[0], pt_A[1])
+                    cor_B = _amostra_bilinear(B, pt_B[0], pt_B[1])
+
+                    cor_final = (1 - beta) * cor_A + beta * cor_B
+                    
+                    frame_out[y, x] = cor_final
+                    
+    return frame_out
